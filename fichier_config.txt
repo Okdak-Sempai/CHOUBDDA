@@ -1,0 +1,6 @@
+config_path=/path
+db_path=/path
+page_size=4096
+dm_maxfilesize=12288
+dm_buffercount=4
+dm_policy=LRU
