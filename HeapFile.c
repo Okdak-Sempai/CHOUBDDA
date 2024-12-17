@@ -6,13 +6,13 @@
 
 #include <stdlib.h>
 
-HeapFileDataPage *getDataPage(PageId *pageId)
+HeapFileDataPage *__getDataPage(PageId *pageId, const char *function, const char *filename, size_t line)
 {
 	HeapFileDataPage *dataPage = calloc(1, sizeof(HeapFileDataPage));
 	if (dataPage == NULL)
 		return NULL;
 
-	dataPage->head = GetPage(pageId);
+	dataPage->head = __GetPage(pageId, function, filename, line);
 	dataPage->page_id = pageId;
 
 	dataPage->directory = (SlotDirectory *)(dataPage->head + config->pagesize - sizeof(SlotDirectory));
@@ -21,12 +21,12 @@ HeapFileDataPage *getDataPage(PageId *pageId)
 	return dataPage;
 }
 
-void freeDataPage(HeapFileDataPage *page, uint8_t dirty)
+void __freeDataPage(HeapFileDataPage *page, uint8_t dirty, const char *function, const char *filename, size_t line)
 {
 	if (!page)
 		return;
 
-	FreePage(page->page_id, dirty);
+	__FreePage(page->page_id, dirty, function, filename, line);
 	free(page);
 }
 

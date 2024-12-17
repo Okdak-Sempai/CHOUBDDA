@@ -1,5 +1,4 @@
-config_path=/path
-db_path=/path
+db_path=/mnt/s/DocumentsX/DevDir/CLion/SHINBDDA/cmake-build-debug/BDD Stack/
 page_size=4096
 dm_maxfilesize=12288
 dm_buffercount=4

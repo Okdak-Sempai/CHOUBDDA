@@ -81,12 +81,14 @@ void free_relation(Relation *relation) {
 void addDataPage(Relation *rel)
 {
     HeapFileHdr *hdr = (HeapFileHdr *)GetPage(rel->tailHdrPageId);
-    size_t cur_hdr_sz = sizeof(*hdr) + hdr->nb_data_pages * sizeof(HeapFileDataDesc); // can sizeof hdr because flexible array at the HeapFileHdr structure's end
+    size_t cur_hdr_sz = offsetof(HeapFileHdr, pages) + hdr->nb_data_pages * sizeof(HeapFileDataDesc); // can sizeof hdr because flexible array at the HeapFileHdr structure's end
+    FreePage(rel->tailHdrPageId, 0);
 
     if (cur_hdr_sz + sizeof(HeapFileDataDesc) > config->pagesize)
     {
         assert(!hdr->has_next);
 
+        FreePage(rel->tailHdrPageId, 0);
         PageId *next = AllocPage();
         if (!next)
             return;
@@ -114,7 +116,8 @@ void addDataPage(Relation *rel)
     sd->directory->nb_slots = 0;
     freeDataPage(sd, 1);
 
-    hdr->pages[hdr->nb_data_pages].free = config->pagesize;
+    hdr = (HeapFileHdr *)GetPage(rel->tailHdrPageId);
+    hdr->pages[hdr->nb_data_pages].free = config->pagesize - sizeof(SlotDirectory);
     hdr->pages[hdr->nb_data_pages].pageId = *data;
 
     hdr->nb_data_pages++;
@@ -133,7 +136,7 @@ PageId *getFreeDataPage(const Relation *rel, size_t record_size)
         uint8_t found = 0;
         for (size_t i = 0; i < hdr->nb_data_pages; i++)
         {
-            if (record_size <= hdr->pages[i].free)
+            if (record_size + sizeof(SlotDirectoryEntry) <= hdr->pages[i].free)
             {
                 found = 1;
                 res = FindPageId(hdr->pages[i].pageId);
@@ -190,13 +193,25 @@ RecordId writeRecordToDataPage(const Record *record, PageId *pageId)
         is_new_slot = 1;
     }
 
-    free_entry->size_record = writeRecordToBuffer(record, data_page->head, free_entry->start_record);
+    const size_t written = writeRecordToBuffer(record, data_page->head, free_entry->start_record);
+    free_entry->size_record = written;
 
     if (is_new_slot)
-        data_page->directory->first_free += free_entry->size_record;
+        data_page->directory->first_free += written;
 
     data_page->directory->nb_slots++;
     freeDataPage(data_page, 1);
+
+    HeapFileHdr *hdr = (HeapFileHdr *)GetPage(record->rel->headHdrPageId);
+    for (size_t i = 0; i < hdr->nb_data_pages; i++)
+    {
+        if (hdr->pages[i].pageId.FileIdx == pageId->FileIdx && hdr->pages[i].pageId.PageIdx == pageId->PageIdx)
+        {
+            hdr->pages[i].free -= written + sizeof(SlotDirectoryEntry);
+            break;
+        }
+    }
+    FreePage(record->rel->headHdrPageId, 1);
     return rid;
 }
 

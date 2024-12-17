@@ -54,16 +54,11 @@ void LoadDBConfig(const char* fichier_config)
 		std::string prop = match[1].str();
 		std::string value = match[2].str();
 
-		std::transform(prop.begin(), prop.end(), prop.begin(), ::tolower);
+		std::ranges::transform(prop, prop.begin(), ::tolower);
 
-		if (prop == "config_path")
+		if (prop == "db_path")
 		{
-			delete config->configpath;
-			config->configpath = dup_str(value);
-		}
-		else if (prop == "db_path")
-		{
-			delete config->dbpath;
+			delete[] config->dbpath;
 			config->dbpath = dup_str(value);
 		}
 		else if (prop == "page_size")
@@ -74,7 +69,7 @@ void LoadDBConfig(const char* fichier_config)
 			config->dm_buffercount = std::stoi(value);
 		else if (prop == "dm_policy")
 		{
-			std::transform(value.begin(), value.end(), value.begin(), ::toupper);
+			std::ranges::transform(value, value.begin(), ::toupper);
 			if (value == "LRU")
 				config->dm_policy = POLICY_LRU;
 			else if (value == "MRU")
@@ -84,13 +79,13 @@ void LoadDBConfig(const char* fichier_config)
 		}
 		else
 			throw std::invalid_argument("unknown property: " + prop + " (" + std::to_string(ln) +")");
+
 		ln++;
 	}
 }
 
 void DBFree()
 {
-	delete config->dbpath;
-	delete config->configpath;
+	delete[] config->dbpath;
 	delete config;
 }

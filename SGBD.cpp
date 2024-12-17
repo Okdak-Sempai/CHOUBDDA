@@ -1,5 +1,6 @@
 #include "SGBD.h"
 
+#include <cassert>
 #include <cstring>
 #include <iostream>
 #include <ranges>
@@ -9,16 +10,15 @@
 #include "BufferManager.h"
 #include <string_view>
 #include <filesystem>
+#include <fstream>
+
+#include "SelectCommand.h"
 
 namespace fs = std::filesystem;
 
-struct DBCommandBadSyntax : std::runtime_error
-{
-public:
-	DBCommandBadSyntax(const std::string &cmd, const std::string &msg)
-		: std::runtime_error("error syntax: " + cmd + ": " + msg)
-	{}
-};
+DBCommandBadSyntax::DBCommandBadSyntax(const std::string &cmd, const std::string &msg)
+	: std::runtime_error("error syntax: " + cmd + ": " + msg)
+{}
 
 #define REGISTER_COMMAND(cmd_begin, fn) \
 	{\
@@ -28,10 +28,12 @@ public:
 		command_handlers[key] = [this](const std::string &command){fn(command);}; \
 	}
 
+fs::path SGBD::init_wd;
 SGBD::SGBD(int argc, char** argv)
 {
 	if (argc != 2)
 		throw std::invalid_argument("usage: " + std::string(argv[0]) + " <config file>");
+	init_wd = fs::current_path();
 
 	LoadDBConfig(argv[1]);
 
@@ -55,9 +57,9 @@ SGBD::SGBD(int argc, char** argv)
 	REGISTER_COMMAND("DROP DATABASE", ProcessDropDatabaseCommand);
 	REGISTER_COMMAND("QUIT", ProcessQuitCommand);
 
-	// REGISTER_COMMAND("INSERT INTO", ProcessInsertIntoCommand);
-	// REGISTER_COMMAND("BULKINSERT INTO", ProcessBulkInsertIntoCommand);
-	// REGISTER_COMMAND("SELECT", ProcessSelectCommand);
+	REGISTER_COMMAND("INSERT INTO", ProcessInsertIntoCommand);
+	REGISTER_COMMAND("BULKINSERT INTO", ProcessBulkInsertIntoCommand);
+	REGISTER_COMMAND("SELECT", ProcessSelectCommand);
 }
 
 SGBD::~SGBD()
@@ -73,7 +75,7 @@ static void prepareCommand(std::string &cmd)
 	auto not_space = [](unsigned char ch) {
 		return !std::isspace(ch);
 	};
-
+    
 	cmd.erase(cmd.begin(), std::ranges::find_if(cmd, not_space));
 	cmd.erase(std::ranges::find_if(cmd | std::views::reverse, not_space).base(), cmd.end());
 }
@@ -179,7 +181,7 @@ void SGBD::ProcessCreateTableCommand(const std::string &command) const
 
                 std::string type_str = str.substr(str.find(':') + 1);
                 FieldType type;
-                size_t len = 0;
+                size_t len = 1;
                 size_t size = 4;
                 if (type_str == "INT")
                     type = INT;
@@ -187,14 +189,17 @@ void SGBD::ProcessCreateTableCommand(const std::string &command) const
                     type = REAL;
                 else
                 {
-                    size = 1;
-                    std::string type_len = type_str.substr(type_str.find('('));
-                    type_str = type_str.substr(0, type_str.find('('));
+	                size = 1;
+					std::string type_len = type_str.substr(type_str.find('('));
+					type_str = type_str.substr(0, type_str.find('('));
 
-                    if (type_str == "CHAR")
-                        type = FIXED_LENGTH_STRING;
-                    else if (type_str == "VARCHAR")
-                        type = VARCHAR;
+					if (type_str == "CHAR")
+						type = FIXED_LENGTH_STRING;
+					else if (type_str == "VARCHAR")
+					{
+						type = VARCHAR;
+						len = 0;
+					}
                     else
                         throw DBCommandBadSyntax("CREATE TABLE", "couldn't parse field type " + type_str);
 
@@ -258,25 +263,161 @@ void SGBD::ProcessDropDatabaseCommand(const std::string &command)
 	dbManager.RemoveDatabase(match[1].str());
 }
 
-void SGBD::ProcessInsertIntoCommand(const std::string& command)
+void SGBD::recordInserter(const std::string& command, const std::string& fields_str, const DBManager::RelationPtr &rel)
 {
-	std::regex regex(R"(^INSERT INTO ([[:alnum:]]+) VALUES \(([[:alnum:]\\!"#$%&'()*+-./:;<=>?@\[\]^_`{|}~]+)(?:,([[:alnum:]\\!"#$%&'()*+-./:;<=>?@\[\]^_`{|}~]+))*\)$)");
+	std::vector<std::string> fields;
+	std::string current;
+	bool is_quoted = false;
+	for (const char c : fields_str)
+	{
+		if (c == '"')
+			is_quoted = !is_quoted;
+		else if (c == ',' && !is_quoted)
+		{
+			fields.push_back(current);
+			current.clear();
+		}
+		else
+			current.push_back(c);
+	}
+
+	if (is_quoted)
+		throw DBCommandBadSyntax(command, "bad input (unexpected end of input): " +fields_str);
+
+	fields.push_back(current);
+
+	if (static_cast<int>(fields.size()) != rel->nb_fields)
+	{
+		std::stringstream ss;
+		ss << "bad input: unexpected number of fields, expected(" << rel->nb_fields << ") != actual(" << fields.size() << ")";
+		ss << ": " << fields_str;
+		throw DBCommandBadSyntax(command, ss.str());
+	}
+
+	Record *record = newRecord(rel.get());
+	for (int i = 0; i < rel->nb_fields; i++)
+	{
+		try
+		{
+			switch (rel->fieldsMetadata[i].type)
+			{
+			case FIXED_LENGTH_STRING:
+				if (fields[i].length() > rel->fieldsMetadata[i].len)
+				{
+					std::stringstream ss;
+
+					ss << "bad input: field " << i << ": string too long for fixed length field (" << rel->fieldsMetadata[i].len << ")";
+					throw DBCommandBadSyntax(command, ss.str());
+				}
+
+				write_field_string(record, i, fields[i].c_str(), fields[i].length());
+				break;
+
+			case VARCHAR:
+				write_field_string(record, i, fields[i].c_str(), fields[i].length());
+				break;
+
+			case INT:
+				write_field_i32(record, i, std::stoi(fields[i]));
+				break;
+
+			case REAL:
+				write_field_f32(record, i, std::stof(fields[i]));
+				break;
+
+			default: // shouldn't happen...
+				assert(0);
+			}
+		}
+		catch (const std::out_of_range &oor)
+		{
+			std::stringstream ss;
+			ss << "bad input: field " << i << ": out of range number: " << oor.what();
+			throw DBCommandBadSyntax(command, ss.str());
+		}
+		catch (const std::invalid_argument &ia)
+		{
+			std::stringstream ss;
+			ss << "bad input: field " << i << ": bad syntax: " << ia.what();
+			throw DBCommandBadSyntax(command, ss.str());
+		}
+	}
+
+	InsertRecord(record);
+	freeRecord(record);
 }
 
-void SGBD::ProcessBulkInsertIntoCommand(const std::string& command)
+void SGBD::ProcessInsertIntoCommand(const std::string& command) const
 {
-	std::regex regex("^BULKINSERT INTO ([[:alnum:]]+) ([[:alnum:].]+)$");
+	static std::regex regex(R"(^INSERT INTO ([[:alnum:]]+) VALUES \((.+)\)$)");\
+	std::smatch match;
+
+	if (!std::regex_match(command, match, regex))
+		throw DBCommandBadSyntax("INSERT INTO", "couldn't parse input");
+
+	const std::string table_name = match[1].str();
+	const DBManager::RelationPtr &rel = dbManager.GetTableFromCurrentDatabase(table_name);
+	if (rel == nullptr)
+		throw DBCommandBadSyntax("INSERT INTO", "table not found: " + table_name);
+
+	recordInserter("INSERT INTO", match[2].str(), rel);
 }
 
-void SGBD::ProcessSelectCommand(const std::string& command)
+void SGBD::ProcessBulkInsertIntoCommand(const std::string& command) const
+// csv case to manage
 {
-	std::regex regex(R"(^SELECT (\*|([[:alnum:]]+)\.([[:alnum:]]+)(?:,([[:alnum:]]+)\.([[:alnum:]]+))*) FROM ((?:([[:alnum:]]+) ([[:alnum:]]+)))(?: WHERE ([[:alnum:]]+)\.([[:alnum:]]+)(=|<|>|<=|>=|<>)(?: AND ([[:alnum:]]+)\.([[:alnum:]]+)(=|<|>|<=|>=|<>))*)?$)");
+	std::regex regex("^BULKINSERT INTO ([[:alnum:]]+) (.+)$");
+	std::smatch match;
+
+	if (!std::regex_match(command, match, regex))
+		throw DBCommandBadSyntax("BULKINSERT INTO", "couldn't parse input");
+
+	const std::string table_name = match[1].str();
+	const DBManager::RelationPtr &rel = dbManager.GetTableFromCurrentDatabase(table_name);
+	if (rel == nullptr)
+		throw DBCommandBadSyntax("BULKINSERT INTO", "table not found: " + table_name);
+
+	fs::path csv(match[2].str());
+	if (csv.is_relative())
+		csv = init_wd / csv;
+	std::ifstream ifs(csv);
+	if (!ifs.is_open())
+		throw DBCommandBadSyntax("BULKINSERT INTO", "couldn't open file: " + match[2].str());
+
+	for (std::string line; std::getline(ifs, line);)
+		recordInserter("BULKINSERT INTO", line, rel);
+}
+
+void SGBD::ProcessSelectCommand(const std::string& command) const
+{
+	SelectCommand cmd(command);
+
+	// Replaces c style list by C++ vector (and releases directly both the c style list and the relation pointer)
+	std::vector<Record *> records;
+	{
+		const DBManager::RelationPtr rel = dbManager.GetTableFromCurrentDatabase(cmd.relation());
+		cmd.expandProjections(rel);
+
+		RecordList *rec_list = GetAllRecords(rel.get());
+		records.assign(rec_list->records, rec_list->records + rec_list->length);
+		freeRecordList(rec_list);
+	}
+
+	for (Record *rec : records)
+	{
+		cmd(std::cout, rec);
+		freeRecord(rec);
+	}
+	std::cout << "Total records=" << cmd.nb_printed() << "." << std::endl;
 }
 
 void SGBD::ProcessQuitCommand(const std::string &/*not needed, but still mandatory since it's in an array*/) const
 {
+	FlushBuffers();
 	dbManager.SaveState();
     SaveState();
+	clearBufferManager();
 	DBFree();
+	diskFREE();
 	std::exit(0);
 }

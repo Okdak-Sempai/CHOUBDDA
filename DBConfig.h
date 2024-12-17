@@ -18,7 +18,6 @@ typedef struct DBConfig
 *   Configurations data
 */
 {
-    char* configpath; // Settings config path.
     char* dbpath; // Le dossier BDD Stack //A MALLOC
     int pagesize;// Tailles d'une page
     int dm_maxfilesize; // Tailles Max d'un fichier rsdb

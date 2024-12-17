@@ -32,6 +32,8 @@ add_library(DatabaseManagement STATIC
         DBManager.h
         SGBD.cpp
         SGBD.h
+        SelectCommand.cpp
+        SelectCommand.h
 )
 target_link_libraries(DatabaseManagement PUBLIC DBConfig PUBLIC LowLevelDatabase)
 

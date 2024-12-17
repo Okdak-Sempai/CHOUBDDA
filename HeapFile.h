@@ -62,8 +62,11 @@ typedef struct HeapFilePageIdList
 	size_t capacity;
 } HeapFilePageIdList;
 
-HeapFileDataPage *getDataPage(PageId *pageId);
-void freeDataPage(HeapFileDataPage *page, uint8_t dirty);
+HeapFileDataPage *__getDataPage(PageId *pageId, const char *function, const char *filename, size_t line);
+void __freeDataPage(HeapFileDataPage *page, uint8_t dirty, const char *function, const char *filename, size_t line);
+
+#define getDataPage(pageId) __getDataPage(pageId, __PRETTY_FUNCTION__, __FILE__, __LINE__);
+#define freeDataPage(pageId, dirty) __freeDataPage(pageId, dirty, __PRETTY_FUNCTION__, __FILE__, __LINE__);
 
 HeapFilePageIdList *newPageIdList();
 void freePageIdList(HeapFilePageIdList *list);
