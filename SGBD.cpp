@@ -13,8 +13,25 @@
 #include <fstream>
 
 #include "SelectCommand.h"
+#include <csignal>
 
 namespace fs = std::filesystem;
+
+SGBD *SGBD::instance = nullptr;
+
+static void handleSignal(int sig = -1)
+{
+    FlushBuffers();
+    SGBD::saveDBManagerState();
+    SaveState();
+    clearBufferManager();
+    DBFree();
+    diskFREE();
+
+    if (sig == SIGSEGV || sig == SIGABRT || sig == SIGBUS)
+        std::exit(1);
+    std::exit(0);
+}
 
 DBCommandBadSyntax::DBCommandBadSyntax(const std::string &cmd, const std::string &msg)
 	: std::runtime_error("error syntax: " + cmd + ": " + msg)
@@ -31,6 +48,18 @@ DBCommandBadSyntax::DBCommandBadSyntax(const std::string &cmd, const std::string
 fs::path SGBD::init_wd;
 SGBD::SGBD(int argc, char** argv)
 {
+    instance = this;
+
+    signal(SIGINT, handleSignal);
+    signal(SIGABRT, handleSignal);
+    signal(SIGTERM, handleSignal);
+    signal(SIGBUS, handleSignal);
+    signal(SIGQUIT, handleSignal);
+    signal(SIGFPE, handleSignal);
+    signal(SIGSEGV, handleSignal);
+    signal(SIGUSR1, handleSignal);
+    signal(SIGUSR2, handleSignal);
+
 	if (argc != 2)
 		throw std::invalid_argument("usage: " + std::string(argv[0]) + " <config file>");
 	init_wd = fs::current_path();
@@ -413,11 +442,5 @@ void SGBD::ProcessSelectCommand(const std::string& command) const
 
 void SGBD::ProcessQuitCommand(const std::string &/*not needed, but still mandatory since it's in an array*/) const
 {
-	FlushBuffers();
-	dbManager.SaveState();
-    SaveState();
-	clearBufferManager();
-	DBFree();
-	diskFREE();
-	std::exit(0);
+	handleSignal();
 }

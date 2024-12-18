@@ -55,6 +55,8 @@ void LoadDBConfig(const char* fichier_config)
 		std::string value = match[2].str();
 
 		std::ranges::transform(prop, prop.begin(), ::tolower);
+        std::erase_if(prop, ::isspace);
+        std::erase_if(value, ::isspace);
 
 		if (prop == "db_path")
 		{

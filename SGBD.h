@@ -21,6 +21,12 @@ public:
 
 	void Run();
 
+    static void saveDBManagerState()
+    {
+        if (instance)
+            instance->dbManager.SaveState();
+    }
+
 private:
 	static void recordInserter(const std::string& command, const std::string& fields_str, const DBManager::RelationPtr &rel);
 	static fs::path init_wd;
@@ -42,4 +48,6 @@ private:
 
 	DBManager dbManager;
 	std::unordered_map<std::string, std::function<void(const std::string &)>> command_handlers;
+
+    static SGBD *instance;
 };
