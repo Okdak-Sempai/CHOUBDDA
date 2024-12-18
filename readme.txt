@@ -15,6 +15,7 @@ dm_maxfilesize=12288
 dm_buffercount=1[A partir de 1]
 dm_policy=LRU OR MRU
 
+====
 Notes:
 Utilise gcc 11.4.0, g++ 11.4.0
 
