@@ -378,8 +378,8 @@ void SGBD::recordInserter(const std::string& command, const std::string& fields_
 
 void SGBD::ProcessInsertIntoCommand(const std::string& command) const
 {
-	static std::regex regex(R"(^INSERT INTO ([[:alnum:]]+) VALUES \((.+)\)$)");\
-	std::smatch match;
+    std::regex regex(R"(^INSERT INTO ([[:alnum:]]+) VALUES\s*\((.+)\)$)");
+    std::smatch match;
 
 	if (!std::regex_match(command, match, regex))
 		throw DBCommandBadSyntax("INSERT INTO", "couldn't parse input");
@@ -437,7 +437,7 @@ void SGBD::ProcessSelectCommand(const std::string& command) const
 		cmd(std::cout, rec);
 		freeRecord(rec);
 	}
-	std::cout << "Total records=" << cmd.nb_printed() << "." << std::endl;
+    std::cout << cmd.nb_printed() << " tuples." << std::endl;
 }
 
 void SGBD::ProcessQuitCommand(const std::string &/*not needed, but still mandatory since it's in an array*/) const

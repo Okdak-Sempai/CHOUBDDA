@@ -116,7 +116,7 @@ void DBManager::ListTablesInCurrentDatabase() const
 			type_str = "REAL";
 			break;
 		case VARCHAR:
-			type_str = "VARCHAR";
+			type_str = "VARCHAR(" + std::to_string(field.len) + ")";
 			break;
 		default:
 			type_str = "UNKNOWN";
