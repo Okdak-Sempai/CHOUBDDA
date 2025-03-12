@@ -1,35 +1,53 @@
-# CHOUBDDA - Mini-SGBD en C/C++
+# CHOUBDDA - Mini-DBMS in C/C++
 
-Ce projet implémente un mini-système de gestion de base de données (SGBD) en C/C++ qui se focalise sur la gestion des enregistrements, la mémoire tampon et l’exécution de commandes SQL basiques.
+This project implements a mini-database management system (DBMS) in C/C++ that focuses on record management, buffer memory management, and the execution of basic SQL commands.
 
-## Fonctionnalités
+## Features
 
-- **Configuration de la base de données**  
-  Gestion des paramètres essentiels via le module `DBConfig`.
+- **Database Configuration**  
+  Manages essential parameters through the `DBConfig` module.
 
-- **Gestion de la mémoire tampon**  
-  Le module `BufferManager` gère l’allocation et la gestion des tampons pour optimiser les accès disque.
+- **Buffer Memory Management**  
+  The `BufferManager` module handles buffer allocation and management to optimize disk access.
 
-- **Accès disque**  
-  Le module `DiskManager` fournit une abstraction pour les opérations de lecture/écriture sur disque.
+- **Disk Access**  
+  The `DiskManager` module provides an abstraction for disk read/write operations.
 
-- **Stockage des enregistrements (HeapFile)**  
-  Implémentation du stockage non trié des enregistrements dans des fichiers Heap.
+- **Record Storage (HeapFile)**  
+  Implements unsorted record storage using heap files.
 
-- **Gestion des pages**  
-  Le module `PageId` gère les identifiants des pages, essentiel pour la gestion des tampons et des accès disque.
+- **Page Management**  
+  The `PageId` module manages page identifiers, which is essential for both buffer and disk access management.
 
-- **Gestion des enregistrements et des relations**  
-  Les modules `Record` et `Relation` permettent de manipuler les données et de définir les relations entre entités.
+- **Record and Relation Management**  
+  The `Record` and `Relation` modules allow for data manipulation and defining relationships between entities.
 
-- **Cœur du SGBD**  
-  Le module `SGBD` orchestre l’ensemble des opérations du système.
+- **DBMS Core**  
+  The `SGBD` module orchestrates the overall operations of the system.
 
-- **Exécution des commandes SQL**  
-  Le module `SelectCommand` traite les requêtes SQL de type `SELECT`.
+- **SQL Command Execution**  
+  The `SelectCommand` module processes SQL `SELECT` queries.
 
-- **Tests et outils utilitaires**  
-  Les modules `TestsProcedures` et `Tools_L` offrent des procédures de test et des fonctions utilitaires.
+- **Testing and Utility Tools**  
+  The `TestsProcedures` and `Tools_L` modules provide testing routines and utility functions.
 
-## Structure du Projet
+## Project Structure
 
+CHOUBDDA-main/ ├── .gitignore ├── BufferManager.c & BufferManager.h
+├── CMakeLists.txt
+├── DBConfig.c / DBConfig.cpp & DBConfig.h
+├── DBManager.cpp & DBManager.h
+├── DiskManager.c & DiskManager.h
+├── HeapFile.c & HeapFile.h
+├── PageId.c & PageId.h
+├── Record.c & Record.h
+├── Relation.c & Relation.h
+├── SGBD.cpp & SGBD.h
+├── SelectCommand.cpp & SelectCommand.h
+├── Structures.h
+├── TestsProcedures.c & TestsProcedures.h
+├── Tools_L.c & Tools_L.h
+├── fichier_config.txt
+├── launch
+├── main.c / main.cpp
+└── readme.txt
