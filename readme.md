@@ -30,24 +30,3 @@ This project implements a mini-database management system (DBMS) in C/C++ that f
 
 - **Testing and Utility Tools**  
   The `TestsProcedures` and `Tools_L` modules provide testing routines and utility functions.
-
-## Project Structure
-
-CHOUBDDA-main/ ├── .gitignore ├── BufferManager.c & BufferManager.h
-├── CMakeLists.txt
-├── DBConfig.c / DBConfig.cpp & DBConfig.h
-├── DBManager.cpp & DBManager.h
-├── DiskManager.c & DiskManager.h
-├── HeapFile.c & HeapFile.h
-├── PageId.c & PageId.h
-├── Record.c & Record.h
-├── Relation.c & Relation.h
-├── SGBD.cpp & SGBD.h
-├── SelectCommand.cpp & SelectCommand.h
-├── Structures.h
-├── TestsProcedures.c & TestsProcedures.h
-├── Tools_L.c & Tools_L.h
-├── fichier_config.txt
-├── launch
-├── main.c / main.cpp
-└── readme.txt
